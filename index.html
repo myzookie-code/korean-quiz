@@ -306,7 +306,7 @@ table.t th{color:#7a7f9a;font-weight:normal;font-size:16px}
       <ol>
         <li><b>저장 공간 만들기:</b> firebase.google.com 에 구글 계정으로 로그인 → <b>프로젝트 만들기</b> → 왼쪽 메뉴 <b>빌드 → Realtime Database</b> → <b>데이터베이스 만들기</b> → 위치는 싱가포르 → <b>테스트 모드로 시작</b>.</li>
         <li>화면 위쪽에 보이는 주소(<code>https://…firebasedatabase.app</code> 또는 <code>…firebaseio.com</code>)를 복사해서 위 칸에 붙여 넣고 <b>연결하기</b>를 누르세요.</li>
-        <li><b>규칙</b> 탭에 아래 내용을 붙여 넣고 <b>게시</b>하세요. (테스트 모드는 30일 뒤에 막혀요.)<br><code>{"rules":{"rooms":{".read":true,".write":true}}}</code></li>
+        <li><b>규칙</b> 탭에 아래 내용을 붙여 넣고 <b>게시</b>하세요. (테스트 모드는 30일 뒤에 막혀요.)<br><code>{"rules":{"kquiz":{".read":true,".write":true}}}</code></li>
         <li><b>이 파일을 인터넷에 올리기:</b> 파일 이름을 <code>index.html</code>로 두고 Netlify Drop, GitHub Pages 같은 무료 웹호스팅에 올린 뒤, <b>올린 주소로 선생님 화면을 여세요.</b> 그래야 QR코드가 학생 기기에서 열려요.</li>
       </ol>
       <div>※ 저장되는 것은 닉네임·캐릭터·점수뿐이에요. 학생 실명 대신 닉네임을 쓰도록 안내해 주세요. 게임이 끝나면 결과 화면에서 기록을 지울 수 있어요.</div>
@@ -3078,9 +3078,9 @@ async function studentStart(code) {
   const sess = ls.get('kq_stu');
   if (sess && code && sess.code === code) {
     try {
-      const [meta, p] = await Promise.all([Store.get(`rooms/${code}/meta`), Store.get(`rooms/${code}/players/${sess.pid}`)]);
+      const [meta, p] = await Promise.all([Store.get(`kquiz/${code}/meta`), Store.get(`kquiz/${code}/players/${sess.pid}`)]);
       if (meta && p) {
-        const ans = (await Store.get(`rooms/${code}/ans/${sess.pid}`)) || {};
+        const ans = (await Store.get(`kquiz/${code}/ans/${sess.pid}`)) || {};
         Object.assign(ST, { code, pid: sess.pid, nick: p.nick, av: p.av, meta, qset: meta.qset || [], idx: p.idx || 0, score: p.score || 0, streak: p.streak || 0, best: p.best || 0, correct: p.correct || 0, ans, items: p.items || { half: 1, time: 1, shield: 1 } });
         ST.tts = ls.get('kq_tts', meta.settings && meta.settings.tts !== false);
         toast(`${p.av} ${p.nick}(으)로 다시 들어왔어요!`);
@@ -3100,14 +3100,14 @@ $('#joinBtn').onclick = async () => {
   if (!ST.av) return toast('캐릭터를 하나 골라 주세요 🐾');
   const btn = $('#joinBtn'); btn.disabled = true;
   try {
-    const meta = await Store.get(`rooms/${code}/meta`);
+    const meta = await Store.get(`kquiz/${code}/meta`);
     if (!meta) return toast('그런 방이 없어요. 번호를 다시 봐 주세요');
     if (meta.status === 'end') return toast('이미 끝난 게임이에요');
-    const players = (await Store.get(`rooms/${code}/players`)) || {};
+    const players = (await Store.get(`kquiz/${code}/players`)) || {};
     if (Object.values(players).some(p => p.nick === nick)) return toast('같은 닉네임이 있어요. 다른 이름으로 해 볼까요?');
     const pid = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     const rec = { nick, av: ST.av, score: 0, correct: 0, idx: 0, streak: 0, best: 0, done: false, joined: Date.now(), fin: 0, items: { half: 1, time: 1, shield: 1 } };
-    await Store.set(`rooms/${code}/players/${pid}`, rec);
+    await Store.set(`kquiz/${code}/players/${pid}`, rec);
     ls.set('kq_stu', { code, pid });
     Object.assign(ST, { code, pid, nick, meta, qset: meta.qset || [], idx: 0, score: 0, streak: 0, best: 0, correct: 0, ans: {}, items: { half: 1, time: 1, shield: 1 }, wrongs: [] });
     ST.tts = ls.get('kq_tts', meta.settings && meta.settings.tts !== false);
@@ -3128,7 +3128,7 @@ function afterJoin() {
 function showLobby() { ST.phase = 'lobby'; show('s-lobby'); $('#lbMe').textContent = ST.av; $('#lbNick').textContent = ST.nick; refreshOthers(); }
 async function refreshOthers() {
   try {
-    const ps = (await Store.get(`rooms/${ST.code}/players`)) || {};
+    const ps = (await Store.get(`kquiz/${ST.code}/players`)) || {};
     const list = Object.values(ps).sort((a, b) => a.joined - b.joined);
     $('#lbCount').textContent = list.length + '명';
     $('#lbOthers').innerHTML = list.map(p => `<span title="${esc(p.nick)}">${esc(p.av)}</span>`).join('');
@@ -3140,11 +3140,11 @@ async function stuLoop() {
   while (my === ST.loop) {
     await sleep(2000); if (my !== ST.loop) return; n++;
     try {
-      const status = await Store.get(`rooms/${ST.code}/meta/status`);
+      const status = await Store.get(`kquiz/${ST.code}/meta/status`);
       if (my !== ST.loop) return;
       if (status == null) { kicked('방이 닫혔어요.'); return; }
       if (n % 2 === 0) {
-        const me = await Store.get(`rooms/${ST.code}/players/${ST.pid}/nick`);
+        const me = await Store.get(`kquiz/${ST.code}/players/${ST.pid}/nick`);
         if (me == null) { kicked('선생님이 방에서 내보냈어요.'); return; }
       }
       if (ST.phase === 'lobby') { if (n % 2 === 1) refreshOthers(); if (status === 'play') { ST.meta.status = 'play'; startCountdown(); } }
@@ -3161,7 +3161,7 @@ async function kicked(msg) {
 
 async function updateRank() {
   try {
-    const ps = (await Store.get(`rooms/${ST.code}/players`)) || {};
+    const ps = (await Store.get(`kquiz/${ST.code}/players`)) || {};
     const list = rankList(ps); const i = list.findIndex(p => p.pid === ST.pid);
     ST.rank = i + 1; ST.total = list.length;
     if (ST.phase === 'quiz' && i >= 0) { const c = $('#qRank'); c.style.display = ''; c.textContent = `🏅 지금 ${i + 1}등`; }
@@ -3270,7 +3270,7 @@ async function flush() {
   try {
     while (Object.keys(pending).length) {
       const batch = pending; pending = {};
-      try { await Store.update(`rooms/${ST.code}`, batch); }
+      try { await Store.update(`kquiz/${ST.code}`, batch); }
       catch (e) { pending = Object.assign(batch, pending); await sleep(1500); }
     }
   } finally { saving = false; }
@@ -3418,9 +3418,9 @@ $('#dbSave').onclick = async () => {
   if (!u) return toast('Firebase 주소를 넣어 주세요');
   const btn = $('#dbSave'); btn.disabled = true; const old = DB_URL; DB_URL = u;
   try {
-    await Store.set('rooms/_ping', { t: Date.now() });
-    const r = await Store.get('rooms/_ping'); if (!r) throw new Error('읽기 실패');
-    await Store.del('rooms/_ping');
+    await Store.set('kquiz/_ping', { t: Date.now() });
+    const r = await Store.get('kquiz/_ping'); if (!r) throw new Error('읽기 실패');
+    await Store.del('kquiz/_ping');
     ls.set('kq_db_url', u); toast('🟢 연결됐어요!'); renderConn();
   } catch (e) {
     DB_URL = old; console.error(e);
@@ -3445,7 +3445,7 @@ function adminHome() {
   $('#bankList').innerHTML = AREAS.map(a => `<h3>${a.icon} ${esc(a.name)}</h3><ol>${BANK[a.id].map(r => `<li>${r[1] ? r[1] + ' ' : ''}${esc(r[0]).replace(/\n/g, ' / ')} → <b>${esc(r[3])}</b></li>`).join('')}</ol>`).join('');
   const last = ls.get('kq_lastroom');
   $('#resumeRow').style.display = 'none';
-  if (last) Store.get(`rooms/${last}/meta`).then(m => { if (m && m.status !== 'end') { $('#resumeRow').style.display = ''; $('#resumeBtn').textContent = `↩️ 열려 있는 방 ${last} 이어서 하기`; $('#resumeBtn').onclick = () => openRoom(last); } }).catch(() => {});
+  if (last) Store.get(`kquiz/${last}/meta`).then(m => { if (m && m.status !== 'end') { $('#resumeRow').style.display = ''; $('#resumeBtn').textContent = `↩️ 열려 있는 방 ${last} 이어서 하기`; $('#resumeBtn').onclick = () => openRoom(last); } }).catch(() => {});
 }
 function seg(sel, opts, key) {
   const box = $(sel); box.innerHTML = '';
@@ -3471,10 +3471,10 @@ $('#makeRoom').onclick = async () => {
   const btn = $('#makeRoom'); btn.disabled = true;
   try {
     let code = '';
-    for (let t = 0; t < 12; t++) { const c = String(1000 + Math.floor(Math.random() * 9000)); if (!(await Store.get(`rooms/${c}/meta`))) { code = c; break; } }
+    for (let t = 0; t < 12; t++) { const c = String(1000 + Math.floor(Math.random() * 9000)); if (!(await Store.get(`kquiz/${c}/meta`))) { code = c; break; } }
     if (!code) throw new Error('방 번호 만들기 실패');
     const qset = buildQset(s.areas, s.count);
-    await Store.set(`rooms/${code}`, { meta: { status: 'lobby', created: Date.now(), settings: { time: s.time, tts: s.tts, areas: s.areas, count: qset.length }, qset } });
+    await Store.set(`kquiz/${code}`, { meta: { status: 'lobby', created: Date.now(), settings: { time: s.time, tts: s.tts, areas: s.areas, count: qset.length }, qset } });
     ls.set('kq_lastroom', code); SFX.join();
     openRoom(code);
   } catch (e) { console.error(e); toast('방을 만들지 못했어요. 연결을 확인해 주세요'); }
@@ -3494,7 +3494,7 @@ function drawQR(el, text) {
 
 async function openRoom(code) {
   AD.code = code;
-  const meta = await Store.get(`rooms/${code}/meta`);
+  const meta = await Store.get(`kquiz/${code}/meta`);
   if (!meta) { toast('방을 찾을 수 없어요'); return adminHome(); }
   AD.meta = meta; AD.players = {};
   if (meta.status === 'lobby') showAdminLobby();
@@ -3532,14 +3532,14 @@ function renderLobbyPlayers() {
 async function kick(pid, nick) {
   const ok = await modal(`<b>${esc(nick)}</b> 학생을 내보낼까요?`, [['아니요', 0, 'gray'], ['내보내기', 1, '']]);
   if (!ok) return;
-  try { await Store.update(`rooms/${AD.code}`, { [`players/${pid}`]: null, [`ans/${pid}`]: null }); delete AD.players[pid]; renderLobbyPlayers(); if (AD.meta.status === 'play') renderLive(); } catch (e) { toast('내보내지 못했어요'); }
+  try { await Store.update(`kquiz/${AD.code}`, { [`players/${pid}`]: null, [`ans/${pid}`]: null }); delete AD.players[pid]; renderLobbyPlayers(); if (AD.meta.status === 'play') renderLive(); } catch (e) { toast('내보내지 못했어요'); }
 }
 
 async function adminLoop() {
   const my = ++AD.loop;
   while (my === AD.loop) {
     try {
-      const ps = (await Store.get(`rooms/${AD.code}/players`)) || {};
+      const ps = (await Store.get(`kquiz/${AD.code}/players`)) || {};
       if (my !== AD.loop) return;
       AD.players = ps;
       if (AD.meta.status === 'lobby') renderLobbyPlayers();
@@ -3552,14 +3552,14 @@ async function adminLoop() {
 $('#cancelRoom').onclick = async () => {
   const ok = await modal('방을 닫을까요? 들어온 학생들의 기록도 지워져요.', [['아니요', 0, 'gray'], ['방 닫기', 1, '']]);
   if (!ok) return; AD.loop++;
-  try { await Store.del(`rooms/${AD.code}`); } catch (e) {}
+  try { await Store.del(`kquiz/${AD.code}`); } catch (e) {}
   ls.del('kq_lastroom'); adminHome();
 };
 $('#startGame').onclick = async () => {
   if (!Object.keys(AD.players).length) { const ok = await modal('아직 들어온 학생이 없어요. 그래도 시작할까요?', [['기다리기', 0, 'gray'], ['시작', 1, 'green']]); if (!ok) return; }
   try {
     AD.startT = Date.now();
-    await Store.update(`rooms/${AD.code}/meta`, { status: 'play', started: AD.startT });
+    await Store.update(`kquiz/${AD.code}/meta`, { status: 'play', started: AD.startT });
     AD.meta.status = 'play'; SFX.go(); FX.burst(60); showLive();
   } catch (e) { toast('시작하지 못했어요. 다시 눌러 주세요'); }
 };
@@ -3595,14 +3595,14 @@ function renderLive() {
 $('#endGame').onclick = async () => {
   const ok = await modal('게임을 끝내고 결과를 발표할까요?<br><span class="muted">아직 푸는 중인 학생은 지금 점수로 끝나요.</span>', [['조금 더', 0, 'gray'], ['결과 발표!', 1, 'green']]);
   if (!ok) return;
-  try { await Store.update(`rooms/${AD.code}/meta`, { status: 'end', ended: Date.now() }); AD.meta.status = 'end'; AD.loop++; showEnd(); }
+  try { await Store.update(`kquiz/${AD.code}/meta`, { status: 'end', ended: Date.now() }); AD.meta.status = 'end'; AD.loop++; showEnd(); }
   catch (e) { toast('끝내지 못했어요. 다시 눌러 주세요'); }
 };
 
 async function showEnd() {
   show('a-end'); clearInterval(liveClock);
   await sleep(1200); // 학생 기기의 마지막 저장을 잠깐 기다려요
-  let room = null; try { room = await Store.get(`rooms/${AD.code}`); } catch (e) {}
+  let room = null; try { room = await Store.get(`kquiz/${AD.code}`); } catch (e) {}
   room = room || { players: AD.players, ans: {}, meta: AD.meta };
   AD.players = room.players || {}; AD.ans = room.ans || {}; AD.meta = room.meta || AD.meta;
   const list = rankList(AD.players);
@@ -3644,7 +3644,7 @@ $('#copyRes').onclick = async () => {
 $('#delRoom').onclick = async () => {
   const ok = await modal('이 방의 닉네임·점수 기록을 모두 지울까요?', [['아니요', 0, 'gray'], ['지우기', 1, '']]);
   if (!ok) return;
-  try { await Store.del(`rooms/${AD.code}`); ls.del('kq_lastroom'); toast('기록을 지웠어요'); adminHome(); } catch (e) { toast('지우지 못했어요'); }
+  try { await Store.del(`kquiz/${AD.code}`); ls.del('kq_lastroom'); toast('기록을 지웠어요'); adminHome(); } catch (e) { toast('지우지 못했어요'); }
 };
 $('#newGame').onclick = () => { ls.del('kq_lastroom'); adminHome(); };
 
